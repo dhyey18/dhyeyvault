@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(mkdir -p /home/dhyeypatel/Documents/Dhyey/money-manager/dhyeyvault/app/vault/\\\\[id\\\\])",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(mkdir -p /home/dhyeypatel/Documents/Dhyey/money-manager/dhyeyvault/app/api/auth/register \\\\ *)",
+      "Bash(git add *)"
+    ],
+    "additionalDirectories": [
+      "/home/dhyeypatel/Documents/Dhyey/money-manager/dhyeyvault/app/vault",
+      "/home/dhyeypatel/Documents/Dhyey/money-manager/dhyeyvault/app/api/documents"
+    ]
+  }
+}
