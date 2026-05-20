@@ -241,12 +241,22 @@ function renderSettings(prefill) {
 
 // ─── Lock screen ──────────────────────────────────────────────────────────────
 
-function renderLock(vaultUrl, apiToken) {
+async function renderLock(vaultUrl, apiToken) {
   btnLock.style.display = 'none';
   root.innerHTML = '';
 
+  // Check for pending credential queued while locked
+  let hasPending = false;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab) {
+      const cred = await getPendingCredential(tab.id);
+      hasPending = !!cred;
+    }
+  } catch {}
+
   const wrap = el('div', 'lock-center');
-  wrap.innerHTML = '<div class="lock-icon">🔐</div><div class="lock-title">Vault Locked</div><div class="lock-sub">Enter your master password to access saved passwords</div>';
+  wrap.innerHTML = `<div class="lock-icon">🔐</div><div class="lock-title">Vault Locked</div><div class="lock-sub">${hasPending ? '🔑 Credential detected — unlock to save it automatically' : 'Enter your master password to access saved passwords'}</div>`;
 
   const form = el('div', 'field', '<label>Master Password</label>');
   const pwRow = el('div', 'input-row');
@@ -302,9 +312,11 @@ async function renderMain() {
   let entries = [];
   let pendingCred = null;
   let currentDomain = '';
+  let currentTab = null;
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    currentTab = tab;
     if (tab && tab.url) {
       try { currentDomain = new URL(tab.url).hostname.replace(/^www\./, ''); } catch {}
       pendingCred = await getPendingCredential(tab.id);
@@ -314,6 +326,28 @@ async function renderMain() {
     root.innerHTML = '';
     root.appendChild(showError('Failed to load passwords: ' + e.message));
     return;
+  }
+
+  // Auto-save any pending credential that was queued while vault was locked
+  let autoSaved = null;
+  let autoSaveError = null;
+  if (pendingCred && currentTab) {
+    try {
+      await savePasswordToVault(settings.vaultUrl, settings.apiToken, key, {
+        siteName: pendingCred.siteName || currentDomain,
+        siteUrl: pendingCred.siteUrl || `https://${currentDomain}`,
+        username: pendingCred.username,
+        password: pendingCred.password,
+        category: 'other',
+      });
+      await clearPendingCredential(currentTab.id);
+      autoSaved = pendingCred;
+      pendingCred = null;
+      // Reload entries to include the new one
+      entries = await loadPasswordsFromVault(settings.vaultUrl, settings.apiToken, key);
+    } catch (e) {
+      autoSaveError = e.message;
+    }
   }
 
   const siteEntries = entries.filter(e => {
@@ -330,47 +364,43 @@ async function renderMain() {
     root.appendChild(sh);
   }
 
-  // Pending credential banner
-  if (pendingCred) {
+  // Auto-saved success toast
+  if (autoSaved) {
+    const toast = el('div', 'alert success', `✅ Saved "${autoSaved.username}" for ${autoSaved.siteName}`);
+    root.appendChild(toast);
+    root.appendChild(el('div', 'divider'));
+  }
+
+  // Auto-save failed — show manual fallback banner
+  if (autoSaveError && pendingCred) {
     const banner = el('div', 'pending-banner');
     banner.innerHTML = `
-      <div class="banner-title">🔑 Save detected credential?</div>
-      <div class="cred-row"><span>Site</span><span>${pendingCred.siteName || currentDomain}</span></div>
+      <div class="banner-title">⚠️ Auto-save failed — save manually?</div>
       <div class="cred-row"><span>Username</span><span>${pendingCred.username}</span></div>
-      <div class="cred-row"><span>Password</span><span>••••••••</span></div>
+      <div class="cred-row"><span>Error</span><span style="color:#ef4444">${autoSaveError}</span></div>
     `;
     const actions = el('div', 'flex gap-8 mt-2');
     const saveBtn = el('button', 'btn-primary', '💾 Save');
-    saveBtn.style.fontSize = '12px';
-    saveBtn.style.padding = '8px';
+    saveBtn.style.cssText = 'font-size:12px;padding:8px';
     const skipBtn = el('button', 'btn-secondary', 'Skip');
-    skipBtn.style.fontSize = '12px';
-    skipBtn.style.padding = '8px';
-
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    skipBtn.onclick = async () => { await clearPendingCredential(tab.id); renderMain(); };
+    skipBtn.style.cssText = 'font-size:12px;padding:8px';
+    skipBtn.onclick = async () => { await clearPendingCredential(currentTab.id); renderMain(); };
     saveBtn.onclick = async () => {
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<span class="spinner"></span>';
+      saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner"></span>';
       try {
         await savePasswordToVault(settings.vaultUrl, settings.apiToken, key, {
           siteName: pendingCred.siteName || currentDomain,
           siteUrl: pendingCred.siteUrl || `https://${currentDomain}`,
-          username: pendingCred.username,
-          password: pendingCred.password,
-          category: 'other',
+          username: pendingCred.username, password: pendingCred.password, category: 'other',
         });
-        await clearPendingCredential(tab.id);
+        await clearPendingCredential(currentTab.id);
         renderMain();
-      } catch (e) {
-        banner.appendChild(showError(e.message));
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = '💾 Save';
+      } catch (e2) {
+        banner.appendChild(showError(e2.message));
+        saveBtn.disabled = false; saveBtn.innerHTML = '💾 Save';
       }
     };
-
-    actions.appendChild(saveBtn);
-    actions.appendChild(skipBtn);
+    actions.appendChild(saveBtn); actions.appendChild(skipBtn);
     banner.appendChild(actions);
     root.appendChild(banner);
     root.appendChild(el('div', 'divider'));
@@ -384,7 +414,7 @@ async function renderMain() {
       list.appendChild(buildEntryRow(entry, key, settings));
     }
     root.appendChild(list);
-  } else if (!pendingCred && currentDomain) {
+  } else if (!pendingCred && !autoSaved && currentDomain) {
     root.appendChild(el('div', 'empty', `<div class="icon">🔍</div>No saved passwords for ${currentDomain}`));
   }
 

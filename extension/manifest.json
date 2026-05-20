@@ -5,9 +5,19 @@
   "description": "Auto-save and fill passwords from your DhyeyVault",
   "permissions": ["activeTab", "storage", "scripting", "notifications"],
   "host_permissions": ["<all_urls>"],
+  "icons": {
+    "16": "icon16.svg",
+    "48": "icon48.svg",
+    "128": "icon128.svg"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "DhyeyVault Password Manager"
+    "default_title": "DhyeyVault Password Manager",
+    "default_icon": {
+      "16": "icon16.svg",
+      "48": "icon48.svg",
+      "128": "icon128.svg"
+    }
   },
   "content_scripts": [
     {
