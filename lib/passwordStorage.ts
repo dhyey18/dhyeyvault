@@ -46,6 +46,7 @@ export async function savePasswordEntry(
     siteUrl: entry.siteUrl,
     username: entry.username,
     password: entry.encryptedPassword,
+    passwordIv: entry.iv,  // inner IV — required to decrypt the password field
     category: entry.category,
     notes: entry.notes,
     favorite: entry.favorite,
@@ -78,8 +79,8 @@ export async function loadPasswordEntries(
         id: row.id,
         userId: row.userId,
         encryptedPassword: fields.password,
-        iv: row.iv,
         ...fields,
+        iv: fields.passwordIv ?? row.iv,  // prefer stored inner IV; fall back for legacy rows
       });
     } catch {
       // wrong key or corrupt — skip

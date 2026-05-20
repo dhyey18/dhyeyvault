@@ -92,19 +92,24 @@ function generateId() {
 }
 
 async function savePasswordToVault(vaultUrl, apiToken, key, { siteName, siteUrl, username, password, category }) {
+  // Inner encryption — must match webapp's PasswordContext.addEntry
+  const { ciphertext: encPw, iv: pwIv } = await encryptText(password, key);
   const now = new Date().toISOString();
+  // Outer payload — must match lib/passwordStorage.ts savePasswordEntry
   const payload = JSON.stringify({
-    siteName, siteUrl, username, password,
+    siteName, siteUrl, username,
+    password: encPw,
+    passwordIv: pwIv,
     category: category || 'other',
     notes: '', favorite: false,
     createdAt: now, updatedAt: now,
     strength: calcStrength(password),
   });
-  const { ciphertext, iv } = await encryptText(payload, key);
+  const { ciphertext: data, iv } = await encryptText(payload, key);
   const id = generateId();
   await api(vaultUrl, apiToken, '/api/passwords', {
     method: 'POST',
-    body: JSON.stringify({ id, data: ciphertext, iv }),
+    body: JSON.stringify({ id, data, iv }),
   });
   return id;
 }
@@ -422,11 +427,8 @@ function buildEntryRow(entry, key, settings) {
   fillBtn.onclick = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     try {
-      const plain = await decryptText(entry.password, entry.iv, key).catch(async () => {
-        // entry.password might already be the outer encrypted ciphertext from the outer layer
-        // Try decrypting the data field directly
-        return entry.password;
-      });
+      // entry.password = inner ciphertext; entry.passwordIv = inner IV (set by savePasswordToVault)
+      const plain = await decryptText(entry.password, entry.passwordIv, key);
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (username, password) => {
@@ -449,11 +451,11 @@ function buildEntryRow(entry, key, settings) {
   copyBtn.title = 'Copy password';
   copyBtn.onclick = async () => {
     try {
-      const plain = entry.password;
+      const plain = await decryptText(entry.password, entry.passwordIv, key);
       await navigator.clipboard.writeText(plain);
       copyBtn.innerHTML = '✅';
       setTimeout(() => { copyBtn.innerHTML = '📋'; }, 1500);
-    } catch {}
+    } catch { copyBtn.innerHTML = '❌'; setTimeout(() => { copyBtn.innerHTML = '📋'; }, 1500); }
   };
 
   actions.appendChild(fillBtn);
