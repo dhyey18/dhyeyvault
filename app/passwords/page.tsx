@@ -33,6 +33,31 @@ const ALL_CATS: PasswordCategory[] = ['social', 'finance', 'work', 'shopping', '
 
 type ActiveView = 'passwords' | 'health' | 'extension';
 
+const BOOKMARKLET = `javascript:(function(){var sel=['input[type="email"]','input[autocomplete="username"]','input[autocomplete="email"]','input[name*="email" i]','input[name*="user" i]','input[type="text"]'];var u=null;for(var s of sel){u=document.querySelector(s);if(u&&u.value)break;}var pw=document.querySelector('input[type="password"]');var d={s:document.title,u:location.href,n:u?u.value:'',p:pw?pw.value:''};location.href='https://dhyeyvault.vercel.app/save#'+btoa(unescape(encodeURIComponent(JSON.stringify(d))))})();`;
+
+function BookmarkletCode() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(BOOKMARKLET);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="rounded-lg border border-vault-border bg-vault-card p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-vault-muted font-mono truncate">{BOOKMARKLET.slice(0, 60)}…</p>
+        <button
+          onClick={copy}
+          className="flex items-center gap-1.5 shrink-0 rounded-lg bg-vault-purple px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition-colors"
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ExtensionPanel() {
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -161,6 +186,27 @@ function ExtensionPanel() {
             </li>
           ))}
         </ul>
+      </div>
+
+      {/* Safari / iPhone bookmarklet */}
+      <div className="glass rounded-xl p-4 space-y-3 border border-vault-border">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📱</span>
+          <p className="text-sm font-medium text-vault-text">Save from Safari (iPhone / Mac)</p>
+        </div>
+        <p className="text-xs text-vault-muted">
+          Safari doesn&apos;t support extensions the same way Chrome does. Use this <strong className="text-vault-text">bookmarklet</strong> instead — tap it after filling in your login details and it will open DhyeyVault to save them.
+        </p>
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-vault-muted uppercase tracking-wider">How to set it up on iPhone</p>
+          <ol className="text-sm text-vault-muted space-y-1.5 pl-4 list-decimal">
+            <li>Copy the bookmarklet code below</li>
+            <li>In Safari, bookmark any page (tap <strong className="text-vault-text">Share → Add Bookmark</strong>)</li>
+            <li>Edit the bookmark — replace the URL with the copied code</li>
+            <li>Next time you log in to any site, tap the bookmark from your favorites to save the password</li>
+          </ol>
+        </div>
+        <BookmarkletCode />
       </div>
     </div>
   );
