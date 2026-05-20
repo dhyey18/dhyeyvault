@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   KeyRound,
   Plus,
@@ -14,18 +14,160 @@ import {
   Loader2,
   Star,
   Filter,
+  Puzzle,
+  Copy,
+  Check,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { PasswordCard } from '@/components/passwords/PasswordCard';
 import { AddPasswordModal } from '@/components/passwords/AddPasswordModal';
+import { HealthDashboard } from '@/components/passwords/HealthDashboard';
 import { usePasswords } from '@/contexts/PasswordContext';
 import type { PasswordEntry, PasswordCategory } from '@/lib/types';
 import { PASSWORD_CATEGORY_COLORS, PASSWORD_CATEGORY_LABELS } from '@/lib/types';
+import { api } from '@/lib/apiClient';
 
 const ALL_CATS: PasswordCategory[] = ['social', 'finance', 'work', 'shopping', 'email', 'other'];
 
+type ActiveView = 'passwords' | 'health' | 'extension';
+
+function ExtensionPanel() {
+  const [token, setToken] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+
+  const fetchToken = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api<{ token: string }>('/api/auth/extension-token');
+      setToken(data.token);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchToken(); }, [fetchToken]);
+
+  const copy = async () => {
+    if (!token) return;
+    await navigator.clipboard.writeText(token);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="p-4 sm:p-5 space-y-5 max-w-xl">
+      <div>
+        <h2 className="font-semibold text-vault-text mb-1">Browser Extension</h2>
+        <p className="text-sm text-vault-muted">
+          The DhyeyVault Chrome extension auto-detects logins and saves them directly to your vault.
+        </p>
+      </div>
+
+      {/* Step 1 */}
+      <div className="glass rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-vault-purple flex items-center justify-center text-xs font-bold text-white shrink-0">1</span>
+          <p className="text-sm font-medium text-vault-text">Load the extension in Chrome</p>
+        </div>
+        <ol className="text-sm text-vault-muted space-y-1.5 pl-8 list-decimal">
+          <li>Open Chrome and go to <code className="text-vault-purple-light">chrome://extensions</code></li>
+          <li>Enable <strong className="text-vault-text">Developer mode</strong> (top-right toggle)</li>
+          <li>Click <strong className="text-vault-text">Load unpacked</strong></li>
+          <li>Select the <code className="text-vault-purple-light">extension/</code> folder from the project</li>
+        </ol>
+      </div>
+
+      {/* Step 2 */}
+      <div className="glass rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-vault-purple flex items-center justify-center text-xs font-bold text-white shrink-0">2</span>
+          <p className="text-sm font-medium text-vault-text">Copy your API token</p>
+        </div>
+        <p className="text-xs text-vault-muted pl-8">
+          This token lets the extension securely access your vault. Keep it private — it expires in 1 year.
+        </p>
+        {loading ? (
+          <div className="flex items-center gap-2 pl-8 text-vault-muted text-sm">
+            <Loader2 size={14} className="animate-spin" />
+            Generating token…
+          </div>
+        ) : token ? (
+          <div className="pl-8 space-y-2">
+            <div className="flex items-center gap-2 bg-vault-card border border-vault-border rounded-lg px-3 py-2">
+              <code className="flex-1 text-xs text-vault-text font-mono truncate">
+                {showToken ? token : `${token.slice(0, 20)}…`}
+              </code>
+              <button
+                onClick={() => setShowToken(!showToken)}
+                className="text-vault-muted hover:text-vault-text shrink-0"
+              >
+                {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+              <button
+                onClick={copy}
+                className="text-vault-muted hover:text-vault-green transition-colors shrink-0"
+              >
+                {copied ? <Check size={13} className="text-vault-green" /> : <Copy size={13} />}
+              </button>
+            </div>
+            <button
+              onClick={fetchToken}
+              className="flex items-center gap-1.5 text-xs text-vault-muted hover:text-vault-text transition-colors"
+            >
+              <RefreshCw size={12} />
+              Regenerate token
+            </button>
+          </div>
+        ) : (
+          <button onClick={fetchToken} className="ml-8 btn-primary px-4 py-1.5 rounded-lg text-xs font-medium">
+            Generate Token
+          </button>
+        )}
+      </div>
+
+      {/* Step 3 */}
+      <div className="glass rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-vault-purple flex items-center justify-center text-xs font-bold text-white shrink-0">3</span>
+          <p className="text-sm font-medium text-vault-text">Configure the extension</p>
+        </div>
+        <ol className="text-sm text-vault-muted space-y-1.5 pl-8 list-decimal">
+          <li>Click the DhyeyVault extension icon in your browser toolbar</li>
+          <li>Enter your <strong className="text-vault-text">Vault URL</strong> (e.g. <code className="text-vault-purple-light">https://dhyeyvault.vercel.app</code>)</li>
+          <li>Paste the <strong className="text-vault-text">API Token</strong> from Step 2</li>
+          <li>Click <strong className="text-vault-text">Save Settings</strong></li>
+        </ol>
+      </div>
+
+      {/* Features */}
+      <div className="glass rounded-xl p-4">
+        <p className="text-xs font-medium text-vault-muted uppercase tracking-wider mb-3">What the extension does</p>
+        <ul className="space-y-2 text-sm text-vault-muted">
+          {[
+            'Detects login forms and prompts to save credentials',
+            'Auto-fills saved passwords for any site',
+            'Encrypts passwords with your master password before sending',
+            'Works on all websites — banking, social, shopping',
+          ].map((f) => (
+            <li key={f} className="flex items-start gap-2">
+              <Check size={14} className="text-vault-green mt-0.5 shrink-0" />
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 export default function PasswordsPage() {
-  const { locked, loading, setupDone, entries, unlock, setupVault, lock, checkSetup } =
+  const { locked, loading, setupDone, entries, unlock, setupVault, lock, checkSetup, getPlainPassword } =
     usePasswords();
 
   const [masterPw, setMasterPw] = useState('');
@@ -40,6 +182,7 @@ export default function PasswordsPage() {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState<PasswordCategory | 'all'>('all');
   const [favOnly, setFavOnly] = useState(false);
+  const [activeView, setActiveView] = useState<ActiveView>('passwords');
 
   useEffect(() => {
     checkSetup().then(() => setSetupChecked(true));
@@ -73,20 +216,19 @@ export default function PasswordsPage() {
     setConfirmPw('');
   };
 
-  const filtered = entries
-    .filter((e) => {
-      if (filterCat !== 'all' && e.category !== filterCat) return false;
-      if (favOnly && !e.favorite) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        return (
-          e.siteName.toLowerCase().includes(q) ||
-          e.username.toLowerCase().includes(q) ||
-          e.siteUrl.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
+  const filtered = entries.filter((e) => {
+    if (filterCat !== 'all' && e.category !== filterCat) return false;
+    if (favOnly && !e.favorite) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        e.siteName.toLowerCase().includes(q) ||
+        e.username.toLowerCase().includes(q) ||
+        e.siteUrl.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   const catCounts: Record<string, number> = { all: entries.length };
   for (const c of ALL_CATS) catCounts[c] = entries.filter((e) => e.category === c).length;
@@ -140,9 +282,7 @@ export default function PasswordsPage() {
                 )}
 
                 <div>
-                  <label className="text-xs text-vault-muted mb-1 block">
-                    Master Password
-                  </label>
+                  <label className="text-xs text-vault-muted mb-1 block">Master Password</label>
                   <div className="relative">
                     <input
                       type={showMasterPw ? 'text' : 'password'}
@@ -166,9 +306,7 @@ export default function PasswordsPage() {
 
                 {!setupDone && (
                   <div>
-                    <label className="text-xs text-vault-muted mb-1 block">
-                      Confirm Master Password
-                    </label>
+                    <label className="text-xs text-vault-muted mb-1 block">Confirm Master Password</label>
                     <input
                       type="password"
                       required
@@ -194,12 +332,8 @@ export default function PasswordsPage() {
                     <Lock size={15} />
                   )}
                   {authLoading
-                    ? setupDone
-                      ? 'Unlocking…'
-                      : 'Setting up…'
-                    : setupDone
-                    ? 'Unlock Vault'
-                    : 'Create Vault'}
+                    ? setupDone ? 'Unlocking…' : 'Setting up…'
+                    : setupDone ? 'Unlock Vault' : 'Create Vault'}
                 </button>
               </form>
             </div>
@@ -213,44 +347,29 @@ export default function PasswordsPage() {
     <AppShell title="Password Vault">
       <div className="flex h-full">
         <aside className="hidden lg:flex flex-col w-52 shrink-0 border-r border-vault-border p-3 space-y-1">
-          <button
-            onClick={() => setFilterCat('all')}
-            className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-              filterCat === 'all'
-                ? 'bg-vault-purple/20 text-vault-purple-light'
-                : 'text-vault-muted hover:text-vault-text hover:bg-vault-card'
-            }`}
-          >
-            <span>All Passwords</span>
-            <span className="text-xs">{catCounts.all}</span>
-          </button>
-
-          <button
-            onClick={() => setFavOnly(!favOnly)}
-            className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-              favOnly
-                ? 'bg-vault-gold/20 text-vault-gold'
-                : 'text-vault-muted hover:text-vault-text hover:bg-vault-card'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <Star size={13} />
-              Favourites
-            </span>
-            <span className="text-xs">{entries.filter((e) => e.favorite).length}</span>
-          </button>
+          <SidebarBtn
+            active={activeView === 'passwords' && filterCat === 'all' && !favOnly}
+            onClick={() => { setActiveView('passwords'); setFilterCat('all'); setFavOnly(false); }}
+            label="All Passwords"
+            count={catCounts.all}
+          />
+          <SidebarBtn
+            active={favOnly && activeView === 'passwords'}
+            onClick={() => { setActiveView('passwords'); setFavOnly(!favOnly); }}
+            label="Favourites"
+            count={entries.filter((e) => e.favorite).length}
+            icon={<Star size={13} />}
+            gold
+          />
 
           <div className="pt-2">
-            <p className="text-xs text-vault-muted px-3 mb-1 font-medium uppercase tracking-wider">
-              Categories
-            </p>
+            <p className="text-xs text-vault-muted px-3 mb-1 font-medium uppercase tracking-wider">Categories</p>
             {ALL_CATS.map((cat) => {
-              const color = PASSWORD_CATEGORY_COLORS[cat];
-              const active = filterCat === cat;
+              const active = filterCat === cat && activeView === 'passwords';
               return (
                 <button
                   key={cat}
-                  onClick={() => setFilterCat(active ? 'all' : cat)}
+                  onClick={() => { setActiveView('passwords'); setFilterCat(active ? 'all' : cat); }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
                     active
                       ? 'bg-vault-card text-vault-text'
@@ -258,7 +377,7 @@ export default function PasswordsPage() {
                   }`}
                 >
                   <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: PASSWORD_CATEGORY_COLORS[cat] }} />
                     {PASSWORD_CATEGORY_LABELS[cat]}
                   </span>
                   <span className="text-xs text-vault-muted">{catCounts[cat]}</span>
@@ -268,100 +387,144 @@ export default function PasswordsPage() {
           </div>
 
           <div className="flex-1" />
-          <button
-            onClick={lock}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-vault-muted hover:text-vault-red hover:bg-vault-red/10 transition-colors"
-          >
-            <Lock size={14} />
-            Lock Vault
-          </button>
+
+          <div className="space-y-1 border-t border-vault-border pt-2">
+            <SidebarBtn
+              active={activeView === 'health'}
+              onClick={() => setActiveView('health')}
+              label="Security Health"
+              icon={<ShieldCheck size={14} />}
+            />
+            <SidebarBtn
+              active={activeView === 'extension'}
+              onClick={() => setActiveView('extension')}
+              label="Browser Extension"
+              icon={<Puzzle size={14} />}
+            />
+            <button
+              onClick={lock}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-vault-muted hover:text-vault-red hover:bg-vault-red/10 transition-colors"
+            >
+              <Lock size={14} />
+              Lock Vault
+            </button>
+          </div>
         </aside>
 
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-vault-border">
-            <div className="flex items-center gap-2 flex-1 bg-vault-card border border-vault-border rounded-xl px-3 py-2.5 max-w-sm">
-              <Search size={15} className="text-vault-muted shrink-0" />
-              <input
-                className="flex-1 bg-transparent text-sm text-vault-text placeholder:text-vault-muted outline-none"
-                placeholder="Search passwords…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+          {/* Top bar — only shown on passwords view */}
+          {activeView === 'passwords' && (
+            <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-vault-border">
+              <div className="flex items-center gap-2 flex-1 bg-vault-card border border-vault-border rounded-xl px-3 py-2.5 max-w-sm">
+                <Search size={15} className="text-vault-muted shrink-0" />
+                <input
+                  className="flex-1 bg-transparent text-sm text-vault-text placeholder:text-vault-muted outline-none"
+                  placeholder="Search passwords…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
 
-            <div className="flex items-center gap-2 lg:hidden">
+              <div className="flex items-center gap-2 lg:hidden">
+                <button
+                  onClick={() => setFavOnly(!favOnly)}
+                  className={`p-2 rounded-lg border transition-colors ${
+                    favOnly
+                      ? 'border-vault-gold text-vault-gold bg-vault-gold/10'
+                      : 'border-vault-border text-vault-muted'
+                  }`}
+                >
+                  <Star size={15} />
+                </button>
+                <select
+                  className="bg-vault-card border border-vault-border rounded-lg px-2 py-2 text-xs text-vault-text outline-none"
+                  value={filterCat}
+                  onChange={(e) => setFilterCat(e.target.value as PasswordCategory | 'all')}
+                >
+                  <option value="all">All</option>
+                  {ALL_CATS.map((c) => (
+                    <option key={c} value={c}>{PASSWORD_CATEGORY_LABELS[c]}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Mobile shortcuts */}
+              <div className="flex items-center gap-1 lg:hidden">
+                <button
+                  onClick={() => setActiveView('health')}
+                  className="p-2 rounded-lg border border-vault-border text-vault-muted hover:text-vault-text"
+                  title="Security Health"
+                >
+                  <ShieldCheck size={15} />
+                </button>
+                <button
+                  onClick={() => setActiveView('extension')}
+                  className="p-2 rounded-lg border border-vault-border text-vault-muted hover:text-vault-text"
+                  title="Browser Extension"
+                >
+                  <Puzzle size={15} />
+                </button>
+              </div>
+
               <button
-                onClick={() => setFavOnly(!favOnly)}
-                className={`p-2 rounded-lg border transition-colors ${
-                  favOnly
-                    ? 'border-vault-gold text-vault-gold bg-vault-gold/10'
-                    : 'border-vault-border text-vault-muted'
-                }`}
+                onClick={() => setAddOpen(true)}
+                className="btn-primary flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium"
               >
-                <Star size={15} />
+                <Plus size={15} />
+                <span className="hidden sm:inline">Add Password</span>
               </button>
-              <select
-                className="bg-vault-card border border-vault-border rounded-lg px-2 py-2 text-xs text-vault-text outline-none"
-                value={filterCat}
-                onChange={(e) => setFilterCat(e.target.value as PasswordCategory | 'all')}
-              >
-                <option value="all">All</option>
-                {ALL_CATS.map((c) => (
-                  <option key={c} value={c}>{PASSWORD_CATEGORY_LABELS[c]}</option>
-                ))}
-              </select>
             </div>
+          )}
 
-            <button
-              onClick={() => setAddOpen(true)}
-              className="btn-primary flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium"
-            >
-              <Plus size={15} />
-              <span className="hidden sm:inline">Add Password</span>
-            </button>
-          </div>
+          <div className="flex-1 overflow-y-auto">
+            {activeView === 'health' && (
+              <HealthDashboard
+                entries={entries}
+                getPlainPassword={getPlainPassword}
+                onEditEntry={(e) => { setEditEntry(e); setActiveView('passwords'); }}
+              />
+            )}
 
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5">
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 gap-4">
-                {entries.length === 0 ? (
-                  <>
-                    <KeyRound size={48} className="text-vault-muted" />
-                    <div className="text-center">
-                      <p className="font-medium text-vault-text mb-1">No passwords saved</p>
-                      <p className="text-sm text-vault-muted">
-                        Add your first password to get started
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setAddOpen(true)}
-                      className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium"
-                    >
-                      Add Password
-                    </button>
-                  </>
+            {activeView === 'extension' && <ExtensionPanel />}
+
+            {activeView === 'passwords' && (
+              <div className="p-4 sm:p-5">
+                {filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 gap-4">
+                    {entries.length === 0 ? (
+                      <>
+                        <KeyRound size={48} className="text-vault-muted" />
+                        <div className="text-center">
+                          <p className="font-medium text-vault-text mb-1">No passwords saved</p>
+                          <p className="text-sm text-vault-muted">Add your first password to get started</p>
+                        </div>
+                        <button
+                          onClick={() => setAddOpen(true)}
+                          className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium"
+                        >
+                          Add Password
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Filter size={32} className="text-vault-muted" />
+                        <p className="text-vault-muted text-sm">No passwords match your filters</p>
+                      </>
+                    )}
+                  </div>
                 ) : (
                   <>
-                    <Filter size={32} className="text-vault-muted" />
-                    <p className="text-vault-muted text-sm">No passwords match your filters</p>
+                    <p className="text-xs text-vault-muted mb-3">
+                      {filtered.length} password{filtered.length !== 1 ? 's' : ''}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {filtered.map((entry) => (
+                        <PasswordCard key={entry.id} entry={entry} onEdit={setEditEntry} />
+                      ))}
+                    </div>
                   </>
                 )}
               </div>
-            ) : (
-              <>
-                <p className="text-xs text-vault-muted mb-3">
-                  {filtered.length} password{filtered.length !== 1 ? 's' : ''}
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {filtered.map((entry) => (
-                    <PasswordCard
-                      key={entry.id}
-                      entry={entry}
-                      onEdit={setEditEntry}
-                    />
-                  ))}
-                </div>
-              </>
             )}
           </div>
         </div>
@@ -377,5 +540,35 @@ export default function PasswordsPage() {
         />
       )}
     </AppShell>
+  );
+}
+
+function SidebarBtn({
+  active, onClick, label, count, icon, gold,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count?: number;
+  icon?: React.ReactNode;
+  gold?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors w-full ${
+        active
+          ? gold
+            ? 'bg-vault-gold/20 text-vault-gold'
+            : 'bg-vault-purple/20 text-vault-purple-light'
+          : 'text-vault-muted hover:text-vault-text hover:bg-vault-card'
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        {icon}
+        {label}
+      </span>
+      {count !== undefined && <span className="text-xs">{count}</span>}
+    </button>
   );
 }

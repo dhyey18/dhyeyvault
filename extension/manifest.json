@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "DhyeyVault",
+  "version": "1.0.0",
+  "description": "Auto-save and fill passwords from your DhyeyVault",
+  "permissions": ["activeTab", "storage", "scripting", "notifications"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "DhyeyVault Password Manager"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

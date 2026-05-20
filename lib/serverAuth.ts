@@ -6,6 +6,12 @@ const secret = () => new TextEncoder().encode(process.env.JWT_SECRET!);
 
 export const COOKIE_NAME = 'vault_token';
 
+export const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 export function cookieOptions(): Partial<ResponseCookie> {
   return {
     httpOnly: true,
@@ -30,6 +36,14 @@ export async function signToken(payload: JWTPayload): Promise<string> {
     .sign(secret());
 }
 
+export async function signExtensionToken(payload: JWTPayload): Promise<string> {
+  return new SignJWT(payload as unknown as Record<string, unknown>)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1y')
+    .sign(secret());
+}
+
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
@@ -43,4 +57,14 @@ export async function getAuthUser(req: NextRequest): Promise<JWTPayload | null> 
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyToken(token);
+}
+
+export async function getAuthUserOrBearer(req: NextRequest): Promise<JWTPayload | null> {
+  const cookieUser = await getAuthUser(req);
+  if (cookieUser) return cookieUser;
+  const auth = req.headers.get('authorization');
+  if (auth?.startsWith('Bearer ')) {
+    return verifyToken(auth.slice(7));
+  }
+  return null;
 }

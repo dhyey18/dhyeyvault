@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DhyeyVault</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-logo">
+      <div class="shield">🛡️</div>
+      <span>DhyeyVault</span>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="btn-lock" title="Lock vault" style="display:none">🔒</button>
+      <button class="icon-btn" id="btn-settings" title="Settings">⚙️</button>
+    </div>
+  </div>
+
+  <!-- Main content (swapped via JS) -->
+  <div class="content" id="root"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
