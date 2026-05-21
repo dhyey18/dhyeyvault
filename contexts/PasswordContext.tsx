@@ -16,7 +16,7 @@ import {
   loadPasswordEntries,
   deletePasswordEntry,
 } from '@/lib/passwordStorage';
-import { deriveKey, encryptText, decryptText, generateSalt } from '@/lib/crypto';
+import { deriveKey, encryptText, decryptText, generateSalt, persistSession, restoreSession, clearSession } from '@/lib/crypto';
 import { useAuth } from './AuthContext';
 
 interface PasswordContextValue {
@@ -64,8 +64,30 @@ export function PasswordProvider({ children }: { children: ReactNode }) {
     const meta = await getPasswordMeta(session.userId);
     const done = !!meta;
     setSetupDone(done);
+
+    // Auto-restore 24-hour session if vault is still locked
+    if (done && meta && cryptoKey === null) {
+      const key = await restoreSession();
+      if (key) {
+        const verified = await decryptText(meta.verifier, meta.verifierIv, key).catch(() => null);
+        if (verified === VERIFIER_PLAINTEXT) {
+          setLoading(true);
+          try {
+            const loaded = await loadPasswordEntries(session.userId, key);
+            setCryptoKey(key);
+            setEntries(loaded);
+            setLocked(false);
+          } finally {
+            setLoading(false);
+          }
+        } else {
+          clearSession(); // key is stale / wrong user
+        }
+      }
+    }
+
     return done;
-  }, [session]);
+  }, [session, cryptoKey]);
 
   const setupVault = useCallback(
     async (masterPassword: string) => {
@@ -77,6 +99,7 @@ export function PasswordProvider({ children }: { children: ReactNode }) {
         key
       );
       await setPasswordMeta({ userId: session.userId, salt, verifier, verifierIv });
+      await persistSession(key);
       setCryptoKey(key);
       setSetupDone(true);
       setLocked(false);
@@ -98,6 +121,7 @@ export function PasswordProvider({ children }: { children: ReactNode }) {
         );
         if (verified !== VERIFIER_PLAINTEXT) return false;
         const loaded = await loadPasswordEntries(session.userId, key);
+        await persistSession(key);
         setCryptoKey(key);
         setEntries(loaded);
         setLocked(false);
@@ -110,6 +134,7 @@ export function PasswordProvider({ children }: { children: ReactNode }) {
   );
 
   const lock = useCallback(() => {
+    clearSession();
     setCryptoKey(null);
     setEntries([]);
     setLocked(true);

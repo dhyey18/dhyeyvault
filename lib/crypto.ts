@@ -32,9 +32,47 @@ export async function deriveKey(password: string, saltB64: string): Promise<Cryp
     },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
-    false,
+    true,  // extractable so we can persist the session
     KEY_USAGE
   );
+}
+
+// ── 24-hour key persistence (localStorage) ───────────────────────────────────
+
+const SESSION_STORAGE_KEY = 'dhyeyvault_session';
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface PersistedSession { keyB64: string; expiresAt: number; }
+
+export async function persistSession(key: CryptoKey): Promise<void> {
+  const raw = await crypto.subtle.exportKey('raw', key);
+  const session: PersistedSession = {
+    keyB64: bufferToB64(raw),
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  };
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+export async function restoreSession(): Promise<CryptoKey | null> {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const session: PersistedSession = JSON.parse(raw);
+    if (Date.now() > session.expiresAt) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+    return crypto.subtle.importKey(
+      'raw', b64ToBuffer(session.keyB64),
+      { name: 'AES-GCM' }, true, KEY_USAGE
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function clearSession(): void {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
 export async function encryptText(
