@@ -33,7 +33,8 @@ const ALL_CATS: PasswordCategory[] = ['social', 'finance', 'work', 'shopping', '
 
 type ActiveView = 'passwords' | 'health' | 'extension';
 
-const BOOKMARKLET = `javascript:(function(){var sel=['input[type="email"]','input[autocomplete="username"]','input[autocomplete="email"]','input[name*="email" i]','input[name*="user" i]','input[type="text"]'];var u=null;for(var s of sel){u=document.querySelector(s);if(u&&u.value)break;}var pw=document.querySelector('input[type="password"]');var d={s:document.title,u:location.href,n:u?u.value:'',p:pw?pw.value:''};location.href='https://dhyeyvault.vercel.app/save#'+btoa(unescape(encodeURIComponent(JSON.stringify(d))))})();`;
+// Opens /save in a new tab so the login page stays open; tab auto-closes after save
+const BOOKMARKLET = `javascript:(function(){var sel=['input[type="email"]','input[autocomplete="username"]','input[autocomplete="email"]','input[name*="email" i]','input[name*="user" i]','input[type="text"]'];var u=null;for(var s of sel){u=document.querySelector(s);if(u&&u.value)break;}var pw=document.querySelector('input[type="password"]');var d={s:document.title,u:location.href,n:u?u.value:'',p:pw?pw.value:''};window.open('https://dhyeyvault.vercel.app/save#'+btoa(unescape(encodeURIComponent(JSON.stringify(d)))),'_blank')})();`;
 
 function BookmarkletCode() {
   const [copied, setCopied] = useState(false);
@@ -198,12 +199,18 @@ function ExtensionPanel() {
           Safari doesn&apos;t support extensions the same way Chrome does. Use this <strong className="text-vault-text">bookmarklet</strong> instead — tap it after filling in your login details and it will open DhyeyVault to save them.
         </p>
         <div className="space-y-2">
-          <p className="text-xs font-medium text-vault-muted uppercase tracking-wider">How to set it up on iPhone</p>
+          <p className="text-xs font-medium text-vault-muted uppercase tracking-wider">One-time setup</p>
           <ol className="text-sm text-vault-muted space-y-1.5 pl-4 list-decimal">
             <li>Copy the bookmarklet code below</li>
-            <li>In Safari, bookmark any page (tap <strong className="text-vault-text">Share → Add Bookmark</strong>)</li>
-            <li>Edit the bookmark — replace the URL with the copied code</li>
-            <li>Next time you log in to any site, tap the bookmark from your favorites to save the password</li>
+            <li>In Safari, bookmark any page — tap <strong className="text-vault-text">Share → Add Bookmark</strong></li>
+            <li>Open Bookmarks, find it, tap <strong className="text-vault-text">Edit</strong> → delete the URL → paste the copied code → Save</li>
+          </ol>
+          <p className="text-xs font-medium text-vault-muted uppercase tracking-wider mt-3">How it works (fully automatic once set up)</p>
+          <ol className="text-sm text-vault-muted space-y-1.5 pl-4 list-decimal">
+            <li>Fill in your username &amp; password on any login page</li>
+            <li>Tap the bookmark — a DhyeyVault tab opens &amp; <strong className="text-vault-text">saves instantly</strong></li>
+            <li>The tab closes itself — you&apos;re back on the login page to submit</li>
+            <li>If vault is locked, enter your master password once — saves &amp; closes automatically</li>
           </ol>
         </div>
         <BookmarkletCode />

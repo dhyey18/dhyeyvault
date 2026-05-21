@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { ShieldCheck, Lock, Eye, EyeOff, Loader2, CheckCircle2, X } from 'lucide-react';
 import { usePasswords } from '@/contexts/PasswordContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface Captured {
   s: string;  // site name
@@ -24,45 +24,74 @@ function calcStrength(pw: string): number {
   return Math.min(4, s);
 }
 
+function getSiteName(captured: Captured): string {
+  try { return captured.s || new URL(captured.u).hostname; } catch { return captured.u || 'this site'; }
+}
+
 export default function SavePage() {
   const router = useRouter();
   const { session } = useAuth();
-  const { locked, loading, setupDone, unlock, checkSetup, addEntry } = usePasswords();
+  const { locked, setupDone, unlock, checkSetup, addEntry } = usePasswords();
 
   const [captured, setCaptured] = useState<Captured | null>(null);
-  const [siteName, setSiteName] = useState('');
-  const [siteUrl, setSiteUrl] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [masterPw, setMasterPw] = useState('');
   const [showMaster, setShowMaster] = useState(false);
   const [unlockErr, setUnlockErr] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const savedRef = useRef(false);
 
-  // Read hash fragment on mount
+  // Read hash on mount
   useEffect(() => {
     const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    try {
-      const data: Captured = JSON.parse(atob(hash));
-      setCaptured(data);
-      setSiteName(data.s || '');
-      setSiteUrl(data.u || '');
-      setUsername(data.n || '');
-      setPassword(data.p || '');
-      // Clear hash from URL so password isn't visible
-      history.replaceState(null, '', window.location.pathname);
-    } catch {
-      // invalid hash — just show empty form
+    if (hash) {
+      try {
+        const data: Captured = JSON.parse(decodeURIComponent(escape(atob(hash))));
+        setCaptured(data);
+      } catch {
+        // no credentials — manual mode
+      }
     }
+    history.replaceState(null, '', window.location.pathname);
   }, []);
 
   useEffect(() => {
     if (session) checkSetup();
   }, [session, checkSetup]);
+
+  // Auto-save as soon as vault is unlocked and we have credentials
+  useEffect(() => {
+    if (!locked && captured?.p && !savedRef.current) {
+      savedRef.current = true;
+      doSave(captured);
+    }
+  }, [locked, captured]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function doSave(cred: Captured) {
+    setStatus('saving');
+    try {
+      await addEntry({
+        siteName: getSiteName(cred),
+        siteUrl: cred.u || '',
+        username: cred.n || '',
+        plainPassword: cred.p,
+        category: 'other',
+        notes: '',
+        favorite: false,
+        strength: calcStrength(cred.p),
+      });
+      setStatus('saved');
+      // Close the tab after 1.8 s — works if opened by window.open()
+      setTimeout(() => {
+        try { window.close(); } catch { /* ignore */ }
+        // Fallback: navigate to passwords page
+        setTimeout(() => router.push('/passwords'), 800);
+      }, 1800);
+    } catch {
+      setStatus('error');
+      savedRef.current = false;
+    }
+  }
 
   async function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
@@ -71,80 +100,123 @@ export default function SavePage() {
     const ok = await unlock(masterPw);
     setUnlocking(false);
     if (!ok) setUnlockErr('Wrong master password');
+    // If ok, the useEffect above fires automatically
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!password) return;
-    setSaving(true);
-    try {
-      await addEntry({
-        siteName: siteName || new URL(siteUrl).hostname,
-        siteUrl,
-        username,
-        plainPassword: password,
-        category: 'other',
-        notes: '',
-        favorite: false,
-        strength: calcStrength(password),
-      });
-      setSaved(true);
-      setTimeout(() => router.push('/passwords'), 1500);
-    } catch {
-      // ignore — stay on page
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // Not logged in
+  // ── Not logged in ────────────────────────────────────────────────────────────
   if (!session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#080b18] p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#111827] p-8 text-center">
-          <ShieldCheck className="mx-auto mb-4 h-10 w-10 text-violet-400" />
-          <p className="text-white">Sign in to DhyeyVault first</p>
+      <Screen>
+        <div className="text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-violet-600/20 flex items-center justify-center mx-auto">
+            <ShieldCheck className="h-7 w-7 text-violet-400" />
+          </div>
+          <div>
+            <p className="font-semibold text-white">Sign in first</p>
+            <p className="text-xs text-gray-400 mt-1">You need to be logged in to save passwords</p>
+          </div>
           <button
             onClick={() => router.push('/auth/login')}
-            className="mt-4 w-full rounded-lg bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-500"
+            className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white"
           >
             Go to Login
           </button>
         </div>
-      </div>
+      </Screen>
     );
   }
 
-  // Saved success
-  if (saved) {
+  // ── Saving ───────────────────────────────────────────────────────────────────
+  if (status === 'saving') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#080b18] p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#111827] p-8 text-center">
-          <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-400" />
-          <p className="text-lg font-semibold text-white">Saved!</p>
-          <p className="mt-1 text-sm text-gray-400">Redirecting to your vault…</p>
+      <Screen>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-10 w-10 text-violet-400 animate-spin mx-auto" />
+          <div>
+            <p className="font-semibold text-white">Saving password…</p>
+            {captured && (
+              <p className="text-xs text-gray-400 mt-1">{getSiteName(captured)}</p>
+            )}
+          </div>
         </div>
-      </div>
+      </Screen>
     );
   }
 
-  // Vault locked — unlock first
+  // ── Saved ────────────────────────────────────────────────────────────────────
+  if (status === 'saved') {
+    return (
+      <Screen>
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="h-9 w-9 text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-xl font-bold text-white">Saved!</p>
+            {captured && (
+              <p className="text-sm text-gray-400 mt-1">
+                <span className="text-white font-medium">{captured.n || 'Password'}</span>
+                {' '}for{' '}
+                <span className="text-violet-300">{getSiteName(captured)}</span>
+              </p>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">Closing tab…</p>
+          <button
+            onClick={() => { try { window.close(); } catch { router.push('/passwords'); } }}
+            className="w-full rounded-xl border border-white/10 py-2.5 text-sm text-gray-300 hover:text-white transition-colors"
+          >
+            Close tab
+          </button>
+        </div>
+      </Screen>
+    );
+  }
+
+  // ── Error ─────────────────────────────────────────────────────────────────────
+  if (status === 'error') {
+    return (
+      <Screen>
+        <div className="text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-red-500/20 flex items-center justify-center mx-auto">
+            <X className="h-7 w-7 text-red-400" />
+          </div>
+          <div>
+            <p className="font-semibold text-white">Save failed</p>
+            <p className="text-xs text-gray-400 mt-1">Check your vault is unlocked and try again</p>
+          </div>
+          <button
+            onClick={() => { savedRef.current = false; if (captured) doSave(captured); }}
+            className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+        </div>
+      </Screen>
+    );
+  }
+
+  // ── Vault locked — enter master password ──────────────────────────────────────
   if (locked || !setupDone) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#080b18] p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#111827] p-8">
-          <div className="mb-6 flex items-center gap-3">
-            <Lock className="h-6 w-6 text-violet-400" />
+      <Screen>
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-600/20 flex items-center justify-center shrink-0">
+              <Lock className="h-5 w-5 text-violet-400" />
+            </div>
             <div>
-              <p className="font-semibold text-white">Vault Locked</p>
+              <p className="font-semibold text-white">Vault locked</p>
               {captured && (
                 <p className="text-xs text-gray-400">
-                  Unlock to save <span className="text-violet-300">{captured.s || captured.u}</span>
+                  Unlock to save{' '}
+                  <span className="text-violet-300 font-medium">{getSiteName(captured)}</span>
                 </p>
               )}
             </div>
           </div>
-          <form onSubmit={handleUnlock} className="space-y-4">
+
+          <form onSubmit={handleUnlock} className="space-y-3">
             <div className="relative">
               <input
                 type={showMaster ? 'text' : 'password'}
@@ -152,86 +224,66 @@ export default function SavePage() {
                 onChange={(e) => setMasterPw(e.target.value)}
                 placeholder="Master password"
                 autoFocus
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
+                autoComplete="current-password"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 pr-12 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowMaster((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-white"
               >
                 {showMaster ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {unlockErr && <p className="text-xs text-red-400">{unlockErr}</p>}
+
+            {unlockErr && (
+              <p className="text-xs text-red-400 flex items-center gap-1">
+                <X className="h-3 w-3" />{unlockErr}
+              </p>
+            )}
+
             <button
               type="submit"
               disabled={unlocking || !masterPw}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-3.5 text-sm font-semibold text-white disabled:opacity-50 transition-opacity active:scale-[0.98]"
             >
-              {unlocking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-              Unlock & Save
+              {unlocking
+                ? <><Loader2 className="h-4 w-4 animate-spin" />Unlocking…</>
+                : <><Lock className="h-4 w-4" />Unlock &amp; Save</>}
             </button>
           </form>
         </div>
-      </div>
+      </Screen>
     );
   }
 
-  // Vault unlocked — save form
+  // ── Unlocked but no captured credentials (manual entry) ────────────────────
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#080b18] p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#111827] p-8">
-        <div className="mb-6 flex items-center gap-3">
-          <ShieldCheck className="h-6 w-6 text-violet-400" />
-          <p className="font-semibold text-white">Save to DhyeyVault</p>
-        </div>
-        <form onSubmit={handleSave} className="space-y-3">
-          <input
-            type="text"
-            value={siteName}
-            onChange={(e) => setSiteName(e.target.value)}
-            placeholder="Site name"
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
-          />
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username / email"
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
-          />
-          <div className="relative">
-            <input
-              type={showPw ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-            >
-              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          <button
-            type="submit"
-            disabled={saving || !password}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-            Save Password
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/passwords')}
-            className="w-full rounded-lg py-2 text-sm text-gray-400 hover:text-white"
-          >
-            Cancel
-          </button>
-        </form>
+    <Screen>
+      <p className="text-center text-sm text-gray-400">
+        No credentials detected. Use the Safari bookmarklet while on a login page.
+      </p>
+      <button
+        onClick={() => router.push('/passwords')}
+        className="mt-4 w-full rounded-xl border border-white/10 py-3 text-sm text-gray-300 hover:text-white"
+      >
+        Go to Passwords
+      </button>
+    </Screen>
+  );
+}
+
+function Screen({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-5 bg-[#080b18]"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl p-6"
+        style={{ background: 'rgba(20,29,53,0.9)', border: '1px solid rgba(30,45,77,0.8)' }}
+      >
+        {children}
       </div>
     </div>
   );
