@@ -522,7 +522,7 @@ export default function PasswordsPage() {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto">
+          <div key={activeView} className="flex-1 overflow-y-auto">
             {activeView === 'health' && (
               <HealthDashboard
                 entries={entries}
