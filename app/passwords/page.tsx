@@ -33,8 +33,8 @@ const ALL_CATS: PasswordCategory[] = ['social', 'finance', 'work', 'shopping', '
 
 type ActiveView = 'passwords' | 'health' | 'extension';
 
-// Opens /save in a new tab so the login page stays open; tab auto-closes after save
-const BOOKMARKLET = `javascript:(function(){var sel=['input[type="email"]','input[autocomplete="username"]','input[autocomplete="email"]','input[name*="email" i]','input[name*="user" i]','input[type="text"]'];var u=null;for(var s of sel){u=document.querySelector(s);if(u&&u.value)break;}var pw=document.querySelector('input[type="password"]');var d={s:document.title,u:location.href,n:u?u.value:'',p:pw?pw.value:''};window.open('https://dhyeyvault.vercel.app/save#'+btoa(unescape(encodeURIComponent(JSON.stringify(d)))),'_blank')})();`;
+// Tries native iOS app first (dhyeyvault://), falls back to web /save tab
+const BOOKMARKLET = `javascript:(function(){var sel=['input[type="email"]','input[autocomplete="username"]','input[autocomplete="email"]','input[name*="email" i]','input[name*="user" i]','input[type="text"]'];var u=null;for(var s of sel){u=document.querySelector(s);if(u&&u.value)break;}var pw=document.querySelector('input[type="password"]');var d={s:document.title,u:location.href,n:u?u.value:'',p:pw?pw.value:''};var h=btoa(unescape(encodeURIComponent(JSON.stringify(d))));var opened=false;var fallback=setTimeout(function(){if(!opened)window.open('https://dhyeyvault.vercel.app/save#'+h,'_blank');},1200);document.addEventListener('visibilitychange',function v(){if(document.hidden){opened=true;clearTimeout(fallback);}document.removeEventListener('visibilitychange',v);});window.location.href='dhyeyvault://save#'+h;})();`;
 
 function BookmarkletCode() {
   const [copied, setCopied] = useState(false);
@@ -196,7 +196,7 @@ function ExtensionPanel() {
           <p className="text-sm font-medium text-vault-text">Save from Safari (iPhone / Mac)</p>
         </div>
         <p className="text-xs text-vault-muted">
-          Safari doesn&apos;t support extensions the same way Chrome does. Use this <strong className="text-vault-text">bookmarklet</strong> instead — tap it after filling in your login details and it will open DhyeyVault to save them.
+          Safari doesn&apos;t support extensions the same way Chrome does. Use this <strong className="text-vault-text">bookmarklet</strong> instead — tap it after filling in your login details. If the <strong className="text-vault-text">DhyeyVault app</strong> is installed it opens automatically; otherwise the web app opens in a new tab.
         </p>
         <div className="space-y-2">
           <p className="text-xs font-medium text-vault-muted uppercase tracking-wider">One-time setup</p>
