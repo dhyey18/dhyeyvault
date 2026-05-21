@@ -129,3 +129,33 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* Safe-area-aware bottom padding for content above the mobile tab bar */
+.pb-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 3.75rem);
+}
+
+/* Hide scrollbar for chip rows */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Tap highlight removal for mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS font size adjustment on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Better iOS input styling */
+input, textarea, select {
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+
+/* Ensure modals/overlays go above bottom nav */
+.modal-overlay {
+  z-index: 50;
+}

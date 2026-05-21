@@ -392,6 +392,7 @@ export default function PasswordsPage() {
   return (
     <AppShell title="Password Vault">
       <div className="flex h-full">
+        {/* Desktop sidebar */}
         <aside className="hidden lg:flex flex-col w-52 shrink-0 border-r border-vault-border p-3 space-y-1">
           <SidebarBtn
             active={activeView === 'passwords' && filterCat === 'all' && !favOnly}
@@ -407,7 +408,6 @@ export default function PasswordsPage() {
             icon={<Star size={13} />}
             gold
           />
-
           <div className="pt-2">
             <p className="text-xs text-vault-muted px-3 mb-1 font-medium uppercase tracking-wider">Categories</p>
             {ALL_CATS.map((cat) => {
@@ -417,9 +417,7 @@ export default function PasswordsPage() {
                   key={cat}
                   onClick={() => { setActiveView('passwords'); setFilterCat(active ? 'all' : cat); }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                    active
-                      ? 'bg-vault-card text-vault-text'
-                      : 'text-vault-muted hover:text-vault-text hover:bg-vault-card'
+                    active ? 'bg-vault-card text-vault-text' : 'text-vault-muted hover:text-vault-text hover:bg-vault-card'
                   }`}
                 >
                   <span className="flex items-center gap-2">
@@ -431,36 +429,110 @@ export default function PasswordsPage() {
               );
             })}
           </div>
-
           <div className="flex-1" />
-
           <div className="space-y-1 border-t border-vault-border pt-2">
-            <SidebarBtn
-              active={activeView === 'health'}
-              onClick={() => setActiveView('health')}
-              label="Security Health"
-              icon={<ShieldCheck size={14} />}
-            />
-            <SidebarBtn
-              active={activeView === 'extension'}
-              onClick={() => setActiveView('extension')}
-              label="Browser Extension"
-              icon={<Puzzle size={14} />}
-            />
-            <button
-              onClick={lock}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-vault-muted hover:text-vault-red hover:bg-vault-red/10 transition-colors"
-            >
-              <Lock size={14} />
-              Lock Vault
+            <SidebarBtn active={activeView === 'health'} onClick={() => setActiveView('health')} label="Security Health" icon={<ShieldCheck size={14} />} />
+            <SidebarBtn active={activeView === 'extension'} onClick={() => setActiveView('extension')} label="Browser Extension" icon={<Puzzle size={14} />} />
+            <button onClick={lock} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-vault-muted hover:text-vault-red hover:bg-vault-red/10 transition-colors">
+              <Lock size={14} />Lock Vault
             </button>
           </div>
         </aside>
 
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          {/* Top bar — only shown on passwords view */}
+
+          {/* ── Mobile top toolbar ── */}
+          <div className="lg:hidden flex flex-col gap-0 border-b border-vault-border">
+            {/* View tabs */}
+            <div className="flex border-b border-vault-border">
+              {([
+                { id: 'passwords', label: 'Passwords', icon: <KeyRound size={14} /> },
+                { id: 'health',    label: 'Health',    icon: <ShieldCheck size={14} /> },
+                { id: 'extension', label: 'Extension', icon: <Puzzle size={14} /> },
+              ] as const).map(({ id, label, icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveView(id)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors border-b-2 ${
+                    activeView === id
+                      ? 'border-vault-purple-light text-vault-purple-light'
+                      : 'border-transparent text-vault-muted'
+                  }`}
+                >
+                  {icon}{label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search + Add (passwords view only) */}
+            {activeView === 'passwords' && (
+              <div className="flex flex-col gap-2 px-4 pt-3 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 bg-vault-card border border-vault-border rounded-xl px-3 py-2.5">
+                    <Search size={15} className="text-vault-muted shrink-0" />
+                    <input
+                      className="flex-1 bg-transparent text-sm text-vault-text placeholder:text-vault-muted outline-none min-w-0"
+                      placeholder="Search passwords…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={() => setAddOpen(true)}
+                    className="btn-primary flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium shrink-0"
+                  >
+                    <Plus size={15} />
+                  </button>
+                </div>
+
+                {/* Category chips + favourites */}
+                <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+                  <div className="flex items-center gap-1.5 w-max pb-1">
+                    <button
+                      onClick={() => { setFilterCat('all'); setFavOnly(false); }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                        filterCat === 'all' && !favOnly ? 'bg-vault-purple text-white' : 'bg-vault-card text-vault-muted border border-vault-border'
+                      }`}
+                    >All ({catCounts.all})</button>
+                    <button
+                      onClick={() => setFavOnly(!favOnly)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                        favOnly ? 'bg-vault-gold text-black' : 'bg-vault-card text-vault-muted border border-vault-border'
+                      }`}
+                    >⭐ Fav</button>
+                    {ALL_CATS.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => { setFilterCat(filterCat === cat ? 'all' : cat); setFavOnly(false); }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
+                          filterCat === cat ? 'text-white border-transparent' : 'bg-vault-card text-vault-muted border-vault-border'
+                        }`}
+                        style={filterCat === cat ? { backgroundColor: PASSWORD_CATEGORY_COLORS[cat] } : {}}
+                      >
+                        {PASSWORD_CATEGORY_LABELS[cat]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lock button shown on health/extension views on mobile */}
+            {activeView !== 'passwords' && (
+              <div className="flex items-center justify-end px-4 py-2">
+                <button
+                  onClick={lock}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-vault-muted hover:text-vault-red border border-vault-border transition-colors"
+                >
+                  <Lock size={12} />Lock
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Desktop top bar (passwords view only) ── */}
           {activeView === 'passwords' && (
-            <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-vault-border">
+            <div className="hidden lg:flex items-center gap-3 p-4 sm:p-5 border-b border-vault-border">
               <div className="flex items-center gap-2 flex-1 bg-vault-card border border-vault-border rounded-xl px-3 py-2.5 max-w-sm">
                 <Search size={15} className="text-vault-muted shrink-0" />
                 <input
@@ -470,54 +542,11 @@ export default function PasswordsPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-
-              <div className="flex items-center gap-2 lg:hidden">
-                <button
-                  onClick={() => setFavOnly(!favOnly)}
-                  className={`p-2 rounded-lg border transition-colors ${
-                    favOnly
-                      ? 'border-vault-gold text-vault-gold bg-vault-gold/10'
-                      : 'border-vault-border text-vault-muted'
-                  }`}
-                >
-                  <Star size={15} />
-                </button>
-                <select
-                  className="bg-vault-card border border-vault-border rounded-lg px-2 py-2 text-xs text-vault-text outline-none"
-                  value={filterCat}
-                  onChange={(e) => setFilterCat(e.target.value as PasswordCategory | 'all')}
-                >
-                  <option value="all">All</option>
-                  {ALL_CATS.map((c) => (
-                    <option key={c} value={c}>{PASSWORD_CATEGORY_LABELS[c]}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Mobile shortcuts */}
-              <div className="flex items-center gap-1 lg:hidden">
-                <button
-                  onClick={() => setActiveView('health')}
-                  className="p-2 rounded-lg border border-vault-border text-vault-muted hover:text-vault-text"
-                  title="Security Health"
-                >
-                  <ShieldCheck size={15} />
-                </button>
-                <button
-                  onClick={() => setActiveView('extension')}
-                  className="p-2 rounded-lg border border-vault-border text-vault-muted hover:text-vault-text"
-                  title="Browser Extension"
-                >
-                  <Puzzle size={15} />
-                </button>
-              </div>
-
               <button
                 onClick={() => setAddOpen(true)}
                 className="btn-primary flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium"
               >
-                <Plus size={15} />
-                <span className="hidden sm:inline">Add Password</span>
+                <Plus size={15} />Add Password
               </button>
             </div>
           )}
@@ -539,15 +568,14 @@ export default function PasswordsPage() {
                   <div className="flex flex-col items-center justify-center h-64 gap-4">
                     {entries.length === 0 ? (
                       <>
-                        <KeyRound size={48} className="text-vault-muted" />
+                        <div className="w-16 h-16 rounded-2xl bg-vault-card border border-vault-border flex items-center justify-center">
+                          <KeyRound size={28} className="text-vault-muted" />
+                        </div>
                         <div className="text-center">
-                          <p className="font-medium text-vault-text mb-1">No passwords saved</p>
+                          <p className="font-semibold text-vault-text mb-1">No passwords saved</p>
                           <p className="text-sm text-vault-muted">Add your first password to get started</p>
                         </div>
-                        <button
-                          onClick={() => setAddOpen(true)}
-                          className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium"
-                        >
+                        <button onClick={() => setAddOpen(true)} className="btn-primary px-6 py-3 rounded-xl text-sm font-medium">
                           Add Password
                         </button>
                       </>
@@ -579,10 +607,7 @@ export default function PasswordsPage() {
       {(addOpen || editEntry) && (
         <AddPasswordModal
           entry={editEntry}
-          onClose={() => {
-            setAddOpen(false);
-            setEditEntry(null);
-          }}
+          onClose={() => { setAddOpen(false); setEditEntry(null); }}
         />
       )}
     </AppShell>

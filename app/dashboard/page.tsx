@@ -34,17 +34,17 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="glass rounded-xl p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-vault-muted mb-1">{label}</p>
-          <p className="text-2xl font-bold text-vault-text">{value}</p>
+    <div className="glass rounded-xl p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs text-vault-muted mb-1 truncate">{label}</p>
+          <p className="text-xl sm:text-2xl font-bold text-vault-text">{value}</p>
         </div>
         <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center"
+          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
           style={{ backgroundColor: `${color}20` }}
         >
-          <Icon size={20} style={{ color }} />
+          <Icon size={18} style={{ color }} />
         </div>
       </div>
     </div>
@@ -77,28 +77,28 @@ export default function DashboardPage() {
 
   return (
     <AppShell title="Dashboard">
-      <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
+        {/* Greeting row */}
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-vault-text">
-              {greeting},{' '}
-              <span className="gradient-text">{session?.name?.split(' ')[0]}</span> 👋
+            <h2 className="text-lg sm:text-xl font-bold text-vault-text">
+              {greeting}, <span className="gradient-text">{session?.name?.split(' ')[0]}</span> 👋
             </h2>
-            <p className="text-sm text-vault-muted mt-0.5">
-              {documents.length} document{documents.length !== 1 ? 's' : ''} secured in
-              your vault
+            <p className="text-xs sm:text-sm text-vault-muted mt-0.5">
+              {documents.length} document{documents.length !== 1 ? 's' : ''} secured
             </p>
           </div>
           <button
             onClick={() => setUploadOpen(true)}
-            className="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium w-fit"
+            className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shrink-0"
           >
             <Plus size={16} />
-            Add Document
+            <span className="hidden sm:inline">Add Doc</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard
             label="Total Documents"
             value={documents.length}
